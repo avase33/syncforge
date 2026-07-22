@@ -1,0 +1,17 @@
+{
+  "name": "syncforge-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "syncforge canvas client — a collaborative whiteboard with a client-side CRDT mirror",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview --port 3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2"
+  }
+}

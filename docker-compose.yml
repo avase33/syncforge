@@ -1,0 +1,43 @@
+# Default:  docker compose up --build          -> one in-memory server + client
+# Multi:    SYNCFORGE_PROFILE=redis docker compose --profile redis up --build
+#             -> redis + two servers (8080, 8081) that converge through Pub/Sub
+
+services:
+  server:
+    build: ./server-java
+    ports:
+      - "8080:8080"
+    environment:
+      # Empty by default (in-memory broadcaster); set SYNCFORGE_PROFILE=redis to
+      # join the Redis fan-out along with server-b.
+      SPRING_PROFILES_ACTIVE: ${SYNCFORGE_PROFILE:-}
+      SYNCFORGE_REDIS_HOST: redis
+      SYNCFORGE_REDIS_PORT: "6379"
+
+  client:
+    build: ./client-ts
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["redis"]
+    ports:
+      - "6379:6379"
+
+  # A second instance, active only under the redis profile, to demonstrate that
+  # two servers behind Redis Pub/Sub stay converged.
+  server-b:
+    build: ./server-java
+    profiles: ["redis"]
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: redis
+      SYNCFORGE_REDIS_HOST: redis
+      SYNCFORGE_REDIS_PORT: "6379"
+      SYNCFORGE_DEMO_ENABLED: "false"
+    depends_on:
+      - redis

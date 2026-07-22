@@ -1,0 +1,7 @@
+# Activated with SPRING_PROFILES_ACTIVE=redis to run several instances behind a
+# load balancer, all converging through Redis Pub/Sub. Point these at your
+# broker; ops are idempotent CRDT deltas, so no ordering guarantee is required.
+syncforge:
+  redis:
+    host: ${SYNCFORGE_REDIS_HOST:localhost}
+    port: ${SYNCFORGE_REDIS_PORT:6379}

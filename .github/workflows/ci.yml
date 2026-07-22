@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    name: server (Java 21)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Test
+        working-directory: server-java
+        run: mvn -B test
+      - name: Package
+        working-directory: server-java
+        run: mvn -B -DskipTests package
+
+  client:
+    name: client (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install
+        working-directory: client-ts
+        run: npm install
+      - name: Type-check
+        working-directory: client-ts
+        run: npm run typecheck
+      - name: Build
+        working-directory: client-ts
+        run: npm run build

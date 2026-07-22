@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package syncforge.control.v1;
+
+option java_multiple_files = true;
+option java_package = "com.syncforge.control.grpc";
+option java_outer_classname = "ControlProto";
+
+// The internal control plane. WebSocket carries user-facing board traffic;
+// this gRPC service carries server-to-server and service-to-service calls that
+// want a typed contract and streaming rather than JSON text frames.
+//
+// The default single-node build satisfies this contract with an in-process
+// implementation (see com.syncforge.control.InProcessControlPlane), so no gRPC
+// runtime is needed to run locally. A multi-node deployment binds it to a real
+// grpc-java server behind the `grpc` Maven profile.
+service ControlPlane {
+  // Resolve which server instance currently owns a room (sticky routing).
+  rpc LocateRoom(LocateRoomRequest) returns (LocateRoomReply);
+
+  // Validate a session token before a WebSocket upgrade is accepted.
+  rpc Authenticate(AuthRequest) returns (AuthReply);
+
+  // Subscribe to the cross-instance op stream for a room. This is the gRPC
+  // equivalent of the Redis Pub/Sub fan-out used by the reference build.
+  rpc SubscribeOps(SubscribeRequest) returns (stream OpEnvelope);
+}
+
+message LocateRoomRequest {
+  string room_id = 1;
+}
+
+message LocateRoomReply {
+  string instance_id = 1;   // e.g. "srv-7f3a"
+  string address = 2;       // host:port of the owning instance
+  bool created = 3;         // true if this call created the room ownership
+}
+
+message AuthRequest {
+  string token = 1;
+  string room_id = 2;
+}
+
+message AuthReply {
+  bool allowed = 1;
+  string site_id = 2;       // stable replica id assigned to this session
+  string display_name = 3;
+}
+
+message SubscribeRequest {
+  string room_id = 1;
+  string instance_id = 2;   // so an instance can skip echoes of its own ops
+}
+
+// A CRDT operation as it crosses an instance boundary. The payload is the same
+// JSON `op` frame defined in protocol.md, kept opaque here so the control plane
+// never has to understand board semantics.
+message OpEnvelope {
+  string room_id = 1;
+  string origin_instance = 2;
+  bytes op_json = 3;
+}

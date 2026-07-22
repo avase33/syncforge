@@ -1,0 +1,25 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: syncforge
+  # Project Loom: one virtual thread per WebSocket connection and request.
+  # Idling tens of thousands of connected collaborators costs almost nothing.
+  threads:
+    virtual:
+      enabled: true
+
+# Built-in demo collaborators that draw in the "demo" room on boot, so the
+# dashboard is alive with real CRDT merges before any human connects.
+syncforge:
+  demo:
+    enabled: true
+  # Only consulted under the "redis" profile.
+  redis:
+    host: localhost
+    port: 6379
+
+logging:
+  level:
+    com.syncforge: INFO
