@@ -5,7 +5,10 @@ spring:
   application:
     name: syncforge
   # Project Loom: one virtual thread per WebSocket connection and request.
-  # Idling tens of thousands of connected collaborators costs almost nothing.
+  # Collaborative sessions are idle most of the time, blocked on a socket read.
+  # A parked virtual thread costs a heap-allocated continuation rather than an OS
+  # thread with a reserved stack, so straightforward blocking code per connection
+  # stays affordable. (Rationale, not a measured figure — see README.)
   threads:
     virtual:
       enabled: true

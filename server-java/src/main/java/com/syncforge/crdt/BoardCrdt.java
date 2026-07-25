@@ -16,7 +16,7 @@ import java.util.TreeMap;
  * operations, let them apply those ops (and each other's snapshots) in whatever
  * arbitrary, duplicated, interleaved order the network delivers them, and every
  * replica ends up {@link #equals equal}. {@code BoardCrdtConvergenceTest}
- * asserts exactly that over thousands of randomized schedules.
+ * asserts exactly that over 400 randomized schedules of a 1,500-op history.
  *
  * <p>This class is not thread-safe on its own; {@code Room} owns a board and
  * serialises access to it. Keeping the CRDT free of locks keeps it easy to

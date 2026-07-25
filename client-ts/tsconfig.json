@@ -3,6 +3,13 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+
+    // Vite bundles straight from src/main.ts (see index.html), so tsc is only
+    // ever used as a type-checker here. Without this, `npm run build` — which
+    // runs `tsc && vite build` — would emit stray .js files next to every .ts
+    // source, none of which anything loads.
+    "noEmit": true,
+
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "noUnusedLocals": true,

@@ -18,8 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>The strategy is generate-once, replay-many. A single random history of ops
  * across several replicas is produced (each op carrying a fixed stamp), a
  * reference board is built from it, and then that identical history is shuffled
- * and replayed — with every op applied twice — into fresh boards thousands of
- * times over. If any schedule diverged, the CRDT would be wrong.
+ * and replayed — with every op applied twice — into a fresh board 400 times
+ * over. If any schedule diverged, the CRDT would be wrong. The seed is fixed, so
+ * a failure is reproducible rather than a flake.
  */
 class BoardCrdtConvergenceTest {
 
