@@ -6,14 +6,26 @@ option java_multiple_files = true;
 option java_package = "com.syncforge.control.grpc";
 option java_outer_classname = "ControlProto";
 
-// The internal control plane. WebSocket carries user-facing board traffic;
-// this gRPC service carries server-to-server and service-to-service calls that
-// want a typed contract and streaming rather than JSON text frames.
+// STATUS: DESIGN DOCUMENT — NOT BUILT.
 //
-// The default single-node build satisfies this contract with an in-process
-// implementation (see com.syncforge.control.InProcessControlPlane), so no gRPC
-// runtime is needed to run locally. A multi-node deployment binds it to a real
-// grpc-java server behind the `grpc` Maven profile.
+// This file is not compiled by anything in this repository. There is no
+// protobuf plugin and no grpc-java dependency in server-java/pom.xml, so no
+// stubs are generated from it and no code here implements this service. It is
+// checked in because writing the contract down is the useful part of the design;
+// treat it as a specification, not as an artifact of the build.
+//
+// What it specifies: the internal control plane. WebSocket carries user-facing
+// board traffic; the calls below are the server-to-server and
+// service-to-service concerns that would want a typed contract and streaming
+// rather than JSON text frames.
+//
+// What actually runs: com.syncforge.control.ControlPlane, a plain Java
+// interface covering the first two calls, satisfied by
+// com.syncforge.control.InProcessControlPlane (single node owns every room,
+// permissive auth). Cross-instance op fan-out — the SubscribeOps call below —
+// is handled instead by com.syncforge.bus.RedisBroadcaster under the `redis`
+// profile. Making this a real service would mean adding the protobuf/grpc-java
+// build wiring and an implementation; neither exists yet.
 service ControlPlane {
   // Resolve which server instance currently owns a room (sticky routing).
   rpc LocateRoom(LocateRoomRequest) returns (LocateRoomReply);

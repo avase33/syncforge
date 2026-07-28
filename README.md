@@ -3,9 +3,9 @@
 **A multiplayer state-sync server.** Many people edit one board at once; edits
 arrive out of order, duplicated, or after a reconnect — and everyone still ends
 up looking at exactly the same thing. The guarantee is not "usually consistent."
-It is **convergence by construction**, proven by a property test that replays
-thousands of randomized, duplicate-laden schedules and asserts they all land on
-one board.
+It is **convergence by construction**, backed by a property test that replays a
+1,500-op history in 400 randomized, duplicate-laden orders and asserts every one
+of them lands on the same board.
 
 ```
    browser (canvas + client CRDT)
@@ -26,7 +26,7 @@ one board.
 | **Transport** | Java 21 · Spring WebSocket | One virtual thread per connection; op + presence frames |
 | **State** | Pure Java CRDT | LWW-map of shapes, each field an LWW register; converges under any order |
 | **Fan-out** | In-memory *(default)* · Redis Pub/Sub | Replicating ops to other server instances |
-| **Control plane** | gRPC contract *(in-process default)* | Room ownership, auth, cross-instance op stream |
+| **Control plane** | Plain Java interface, in-process impl | Room ownership, auth (gRPC version is designed, not built — see below) |
 | **Client** | TypeScript · Canvas | A collaborative whiteboard running the *same* CRDT locally |
 
 **The default profile runs the whole thing with no external services** — no
@@ -90,22 +90,69 @@ needs no ordering or exactly-once delivery to be correct.
   `client-ts/src/crdt.ts`
 
 - **Virtual threads for the socket layer.** One Loom virtual thread per
-  connection (and per demo bot), so tens of thousands of idle collaborators cost
-  almost nothing. `spring.threads.virtual.enabled=true`.
+  connection (and per demo bot), via `spring.threads.virtual.enabled=true`. The
+  reason that fits this workload: a collaborative session is idle almost all the
+  time — blocked on a socket read, waiting for a human to move a mouse. A parked
+  virtual thread is a heap object holding its continuation, not an OS thread
+  holding a stack reservation, so idle connections consume memory rather than
+  scheduler resources and stop being the axis you scale on. It buys the clarity
+  of blocking, one-thread-per-connection code without paying per-connection
+  platform-thread costs. *(This is the design rationale, not a measurement —
+  there is no benchmark harness in this repository, so take no throughput or
+  connection-count number from it.)*
 
 ## Testing
 
 ```bash
-make test        # or: cd server-java && mvn test
+make test                       # or: cd server-java && mvn test
 ```
 
-16 tests. The headline is `BoardCrdtConvergenceTest`: it generates one random
-history of 1,500 ops across five replicas, then replays it in 400 different
-shuffled orders — applying every op twice — and asserts every replay equals the
-reference board. It also checks that state-merge reconciliation matches op
-replay, that a delete racing a move resolves identically on both sides, and
-`RoomConcurrencyTest` pounds a single room with 8 threads × 500 ops and asserts
-the result matches a serial replay.
+16 tests across six classes. To run only the headline one:
+
+```bash
+cd server-java && mvn -B test -Dtest=BoardCrdtConvergenceTest
+```
+
+### The convergence property
+
+`server-java/src/test/java/com/syncforge/crdt/BoardCrdtConvergenceTest.java` is
+the test the rest of the project exists to earn. The invariant it establishes:
+
+> Given the same **set** of operations, every replica converges to the same
+> board — regardless of the **order** it applies them in, and regardless of **how
+> many times** it sees each one.
+
+That is the whole correctness argument for the system. If it holds, then network
+reordering, duplicate delivery, and a client reconnecting with a stale backlog
+are all non-events; if it fails, no amount of transport-layer care can save the
+board. So the test attacks it directly rather than checking a few hand-picked
+interleavings:
+
+| What it does | Numbers |
+| --- | --- |
+| Generate one random op history across independent replicas | 1,500 ops, 5 replicas, 12 shapes, 8 fields, fixed seed |
+| Build a reference board by applying it in generation order | 1 board |
+| Replay that same history into a fresh board, shuffled | 400 independent shuffles |
+| Apply every op **twice** on each replay (idempotency under redelivery) | 3,000 applications per shuffle |
+| Assert each replay equals the reference | 400 assertions, all must pass |
+
+The seed is fixed, so a failure is reproducible rather than a flake you can
+shrug off. Three companion tests close the remaining gaps:
+
+- **`stateMergeConvergesJustLikeOpReplay`** — partitions a history across three
+  boards, reconciles them by whole-state `merge` in an arbitrary order (merging
+  one board in twice), and asserts the result equals the op-replay reference.
+  This is what proves op-apply and state-merge are the *same join*, which is why
+  a snapshot and a live op stream can interleave freely.
+- **`concurrentDeleteAndEditResolveByStampEverywhere`** — Alice deletes a shape
+  while Bob, having seen the create, moves it. Both edits must survive (they
+  touch independent registers) and both replicas must agree whichever order the
+  three ops arrive in.
+- **`anEmptyOpHistoryYieldsAnEmptyBoard`** — the base case.
+
+Beyond the CRDT itself, `RoomConcurrencyTest` drives a single room with 8 threads
+× 500 ops and asserts the outcome equals a serial replay, and `WireCodecTest`
+checks that ops and snapshots survive a JSON round-trip with their stamps intact.
 
 ## A note on the stack
 
@@ -117,19 +164,23 @@ those pieces stand for, and is explicit about which are load-bearing here:
 - **Redis Pub/Sub** is a genuine, working adapter (`bus/RedisBroadcaster.java`,
   Lettuce) behind the `redis` profile; the default swaps in an in-process
   broadcaster so the server runs with nothing installed.
-- **gRPC** is the documented internal control-plane contract
-  (`proto/control.proto`, `control/ControlPlane.java`) with an in-process
-  implementation. A single node needs no gRPC runtime; sharding rooms across a
-  fleet is where you bind it to grpc-java.
+- **gRPC is designed but not built.** Room ownership and auth are factored out
+  behind `control/ControlPlane.java`, a plain Java interface whose one
+  implementation is in-process. `proto/control.proto` writes down what that seam
+  would look like as a gRPC service — and nothing compiles it: there is no
+  protobuf plugin and no grpc-java dependency in `pom.xml`, so no stubs are
+  generated and no code here speaks gRPC. Read the `.proto` as a specification.
+  Wiring it up is the work a multi-node deployment would take on; the
+  cross-instance op stream it describes is served today by Redis Pub/Sub instead.
 
 ## Layout
 
 ```
-proto/protocol.md      WebSocket op + snapshot + presence contract
-proto/control.proto    internal gRPC control-plane contract
+proto/protocol.md      WebSocket op + snapshot + presence contract (implemented)
+proto/control.proto    control-plane contract — design document, not compiled
 server-java/           CRDT, rooms, WebSocket, Redis fan-out, REST read API
 client-ts/             Canvas whiteboard with a client-side CRDT mirror
-docs/ARCHITECTURE.md
+docs/ARCHITECTURE.md   Why a CRDT, how register → shape → board composes
 ```
 
 ## License

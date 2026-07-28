@@ -115,10 +115,14 @@ carries the same op to other instances:
 
 Idempotent deltas mean the fan-out needs no ordering or exactly-once guarantee —
 Redis Pub/Sub's at-most-once, unordered delivery cannot desynchronise a board,
-only delay one client's view by a frame. The gRPC control plane
-(`proto/control.proto`) is the typed seam for room ownership and auth that a
-real multi-node deployment grows into; the reference build satisfies it in
-process.
+only delay one client's view by a frame.
+
+Room ownership and auth are kept out of the transport layer behind
+`control/ControlPlane.java`, whose sole implementation is in-process (one node
+owns every room, permissive auth). `proto/control.proto` sketches that seam as a
+gRPC service and is **not compiled by the build** — no protobuf plugin, no
+grpc-java dependency, no generated stubs, nothing here speaking gRPC. It is a
+written-down contract for a multi-node deployment, not shipped functionality.
 
 ## Offline-first
 

@@ -4,11 +4,17 @@ import com.syncforge.room.RoomManager;
 import org.springframework.stereotype.Component;
 
 /**
- * The default control plane: a single node owns every room and every token is
- * accepted, with the site id taken from the token when present. This is the
- * implementation the local build runs; swapping in a gRPC-backed
- * {@code GrpcControlPlane} (behind the {@code grpc} profile) is the only change
- * needed to shard rooms across a fleet.
+ * The default — and currently the only — {@link ControlPlane} implementation: a
+ * single node owns every room, every token is accepted, and the site id is taken
+ * from the token when one is present.
+ *
+ * <p><strong>There is no gRPC implementation in this repository.</strong>
+ * {@code proto/control.proto} records the intended wire contract for this
+ * interface, but it is a documentation artifact only: the build declares no
+ * protobuf plugin and no grpc-java dependency, so nothing is generated from it
+ * and no {@code grpc} Maven profile exists. Sharding rooms across a fleet would
+ * mean adding those and writing a gRPC-backed implementation of this interface;
+ * that work has not been done. Single-node syncforge does not need it.
  */
 @Component
 public class InProcessControlPlane implements ControlPlane {

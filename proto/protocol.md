@@ -84,10 +84,15 @@ Relayed verbatim to the rest of the room and dropped. Never merged into the
 board, never included in a snapshot. If a session disconnects the server emits
 `{ "t": "leave", "site": "alice" }`.
 
-## Internal control plane (gRPC)
+## Internal control plane (design only — not implemented)
 
-Server instances and internal services (auth, room directory) speak gRPC rather
-than WebSocket — see `control.proto`. The default single-node build wires an
-in-process implementation, so no gRPC runtime is required to run locally; the
-contract is defined here because it is the seam a multi-node deployment grows
-into.
+Room ownership and auth are kept out of the transport layer behind
+`control/ControlPlane.java`, a plain Java interface with one implementation:
+`InProcessControlPlane` (single node owns every room, every token accepted).
+
+`control.proto` sketches what that seam would look like as a gRPC service, and
+is **not compiled by the build** — no protobuf plugin, no grpc-java dependency,
+no generated stubs. Nothing in this repository speaks gRPC. The file is checked
+in as a written-down contract for the multi-node deployment this design would
+grow into; the cross-instance op fan-out it describes is implemented today by
+Redis Pub/Sub (`bus/RedisBroadcaster.java`) instead.

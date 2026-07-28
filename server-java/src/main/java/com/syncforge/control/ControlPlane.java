@@ -1,14 +1,18 @@
 package com.syncforge.control;
 
 /**
- * The internal control plane — the Java view of {@code proto/control.proto}.
- * Board traffic rides WebSocket; server-to-server and service-to-service
- * concerns (which instance owns a room, is this token allowed) ride this typed
- * contract, which a multi-node deployment binds to gRPC.
+ * The internal control plane — the Java view of the contract sketched in
+ * {@code proto/control.proto}. Board traffic rides WebSocket; server-to-server
+ * and service-to-service concerns (which instance owns a room, is this token
+ * allowed) are separated out behind this interface so that a multi-node
+ * deployment has a single seam to bind a transport to.
  *
- * <p>The default build supplies {@link InProcessControlPlane}: one node owns
- * every room and auth is permissive, which is exactly right for local
- * development and keeps the reference build free of a gRPC runtime.
+ * <p>{@link InProcessControlPlane} is the only implementation that ships here:
+ * one node owns every room and auth is permissive. Nothing in this repository
+ * speaks gRPC — the {@code .proto} is an unbuilt design document, not generated
+ * code — so this interface is best read as a boundary that keeps room ownership
+ * and auth out of the transport layer, not as an abstraction over two working
+ * transports.
  */
 public interface ControlPlane {
 
